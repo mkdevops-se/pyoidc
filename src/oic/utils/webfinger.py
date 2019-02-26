@@ -1,6 +1,8 @@
 import json
 import logging
 import re
+from typing import Any  # noqa - Used for MyPy
+from typing import Mapping  # noqa - Used for MyPy
 from urllib.parse import urlencode
 from urllib.parse import urlparse
 
@@ -22,7 +24,7 @@ class WebFingerError(PyoidcError):
 
 
 class Base(object):
-    c_param = {}
+    c_param = {}  # type: Mapping[str, Mapping[str, Any]]
 
     def __init__(self, dic=None):
         self._ava = {}
@@ -186,7 +188,7 @@ class URINormalizer(object):
             authority = inp.replace('/', '#').replace('?', '#').split("#")[0]
 
             if ':' in authority:
-                scheme_or_host, host_or_port = authority.split(':', 1)
+                _, host_or_port = authority.split(':', 1)
                 # Assert it's not a port number
                 if re.match(r'^\d+$', host_or_port):
                     return False
@@ -266,12 +268,11 @@ class WebFinger(object):
 
     def discovery_query(self, resource):
         """
-        Given a resource find a OpenID connect OP to use
+        Given a resource find a OpenID connect OP to use.
 
         :param resource: An identifier of an entity
         :return: A URL if an OpenID Connect OP could be found
         """
-
         logger.debug("Looking for OIDC OP for '%s'" % resource)
         url = self.query(resource, OIC_ISSUER)
         try:

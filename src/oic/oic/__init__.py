@@ -4,16 +4,7 @@ import os
 from base64 import b64encode
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
-
-
-from oic.utils.http_util import Response
-
-try:
-    from json import JSONDecodeError
-except ImportError:  # Only works for >= 3.5
-    _decode_err = ValueError
-else:
-    _decode_err = JSONDecodeError
+from json import JSONDecodeError
 
 from jwkest.jwe import JWE
 from jwkest import jws, as_bytes
@@ -70,6 +61,7 @@ from oic.exception import PyoidcError
 from oic.exception import RegistrationError
 from oic.exception import RequestError
 from oic.utils import time_util
+from oic.utils.http_util import Response
 from oic.utils.keyio import KeyJar
 from oic.utils.sanitize import sanitize
 from oic.utils.webfinger import OIC_ISSUER
@@ -160,7 +152,8 @@ def make_openid_request(arq, keys=None, userinfo_claims=None,
                         **kwargs):
     """
     Construct the specification of what I want returned.
-    The request will be signed
+
+    The request will be signed.
 
     :param arq: The Authorization request
     :param keys: Keys to use for signing/encrypting
@@ -169,7 +162,6 @@ def make_openid_request(arq, keys=None, userinfo_claims=None,
     :param request_object_signing_alg: Which signing algorithm to use
     :return: JWT encoded OpenID request
     """
-
     oir_args = {}
     for prop in OpenIDRequest.c_param.keys():
         try:
@@ -287,8 +279,8 @@ def response_types_to_grant_types(resp_types, **kwargs):
 
 def claims_match(value, claimspec):
     """
-    Implements matching according to section 5.5.1 of
-    http://openid.net/specs/openid-connect-core-1_0.html
+    Implement matching according to section 5.5.1 of http://openid.net/specs/openid-connect-core-1_0.html.
+
     The lack of value is not checked here.
     Also the text doesn't prohibit having both 'value' and 'values'.
 
@@ -766,10 +758,10 @@ class Client(oauth2.Client):
                                request_args=None, extra_args=None,
                                http_args=None, response_cls=None):
 
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    scope=scope, state=state)
+        url, body, ht_args, _ = self.request_info(request, method=method,
+                                                  request_args=request_args,
+                                                  extra_args=extra_args,
+                                                  scope=scope, state=state)
 
         if http_args is None:
             http_args = ht_args
@@ -968,14 +960,13 @@ class Client(oauth2.Client):
 
     def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
         """
-        Deal with Provider Config Response
+        Deal with Provider Config Response.
+
         :param pcr: The ProviderConfigResponse instance
         :param issuer: The one I thought should be the issuer of the config
         :param keys: Should I deal with keys
-        :param endpoints: Should I deal with endpoints, that is store them
-        as attributes in self.
+        :param endpoints: Should I deal with endpoints, that is store them as attributes in self.
         """
-
         if "issuer" in pcr:
             _pcr_issuer = pcr["issuer"]
             if pcr["issuer"].endswith("/"):
@@ -1098,7 +1089,7 @@ class Client(oauth2.Client):
 
     def verify_alg_support(self, alg, usage, other):
         """
-        Verifies that the algorithm to be used are supported by the other side.
+        Verify that the algorithm to be used are supported by the other side.
 
         :param alg: The algorithm specification
         :param usage: In which context the 'alg' will be used.
@@ -1110,7 +1101,6 @@ class Client(oauth2.Client):
         :param other: The identifier for the other side
         :return: True or False
         """
-
         try:
             _pcr = self.provider_info
             supported = _pcr["%s_algs_supported" % usage]
@@ -1243,7 +1233,7 @@ class Client(oauth2.Client):
         elif 400 <= response.status_code <= 499:
             try:
                 resp = ErrorResponse().deserialize(response.text, "json")
-            except _decode_err:
+            except JSONDecodeError:
                 logger.error(unk_msg.format(sanitize(response.text)))
                 raise RegistrationError(response.text)
 
@@ -1262,7 +1252,7 @@ class Client(oauth2.Client):
 
     def registration_read(self, url="", registration_access_token=None):
         """
-        Read the client registration info from the given url
+        Read the client registration info from the given url.
 
         :raises RegistrationError: If an error happend
         :return: RegistrationResponse
@@ -1280,7 +1270,7 @@ class Client(oauth2.Client):
 
     def generate_request_uris(self, request_dir):
         """
-        Need to generate a path that is unique for the OP combo
+        Need to generate a path that is unique for the OP combo.
 
         :return: A list of uris
         """
@@ -1291,7 +1281,7 @@ class Client(oauth2.Client):
 
     def create_registration_request(self, **kwargs):
         """
-        Create a registration request
+        Create a registration request.
 
         :param kwargs: parameters to the registration request
         :return:
@@ -1336,7 +1326,7 @@ class Client(oauth2.Client):
 
     def register(self, url, registration_token=None, **kwargs):
         """
-        Register the client at an OP
+        Register the client at an OP.
 
         :param url: The OPs registration endpoint
         :param registration_token: Initial Access Token for registration endpoint
@@ -1361,7 +1351,7 @@ class Client(oauth2.Client):
 
     def normalization(self, principal, idtype="mail"):
         if idtype == "mail":
-            (local, domain) = principal.split("@")
+            (_, domain) = principal.split("@")
             subject = "acct:%s" % principal
         elif idtype == "url":
             p = urlparse(principal)
@@ -1389,7 +1379,9 @@ class Client(oauth2.Client):
     def _verify_id_token(self, id_token, nonce="", acr_values=None, auth_time=0,
                          max_age=0):
         """
-        If the JWT alg Header Parameter uses a MAC based algorithm s uch as
+        Verify IdToken.
+
+        If the JWT alg Header Parameter uses a MAC based algorithm such as
         HS256, HS384, or HS512, the octets of the UTF-8 representation of the
         client_secret corresponding to the client_id contained in the aud
         (audience) Claim are used as the key to validate the signature. For MAC
@@ -1469,16 +1461,14 @@ class Server(oauth2.Server):
 
     def handle_request_uri(self, request_uri, verify=True, sender=''):
         """
+        Handle request URI.
 
-        :param request_uri: URL pointing to where the signed request should
-        be fetched from.
+        :param request_uri: URL pointing to where the signed request should be fetched from.
         :param verify: Whether the signature on the request should be verified.
-        Don't use anything but the default unless you REALLY know what you're
-        doing
+        Don't use anything but the default unless you REALLY know what you're doing
         :param sender: The issuer of the request JWT.
         :return:
         """
-
         # Do a HTTP get
         logger.debug('Get request from request_uri: {}'.format(request_uri))
         try:
@@ -1592,17 +1582,11 @@ class Server(oauth2.Server):
         return oauth2.Server.parse_refresh_token_request(self, request, body)
 
     def parse_check_session_request(self, url=None, query=None):
-        """
-
-        """
         param = self._parse_urlencoded(url, query)
         assert "id_token" in param  # ignore the rest
         return deser_id_token(self, param["id_token"][0])
 
     def parse_check_id_request(self, url=None, query=None):
-        """
-
-        """
         param = self._parse_urlencoded(url, query)
         assert "access_token" in param  # ignore the rest
         return deser_id_token(self, param["access_token"][0])
@@ -1656,8 +1640,7 @@ class Server(oauth2.Server):
     def parse_refresh_session_request(self, url=None, query=None):
         if url:
             parts = urlparse(url)
-            scheme, netloc, path, params, query, fragment = parts[:6]
-
+            query = parts.query
         return RefreshSessionRequest().from_urlencoded(query)
 
     def parse_registration_request(self, data, sformat="urlencoded"):
@@ -1673,6 +1656,7 @@ class Server(oauth2.Server):
     @staticmethod
     def update_claims(session, where, about, old_claims=None):
         """
+        Update claims dictionary.
 
         :param session:
         :param where: Which request
@@ -1680,7 +1664,6 @@ class Server(oauth2.Server):
         :param old_claims:
         :return: claims or None
         """
-
         if old_claims is None:
             old_claims = {}
 
@@ -1713,7 +1696,7 @@ class Server(oauth2.Server):
 
     def id_token_claims(self, session):
         """
-        Pick the IdToken claims from the request
+        Pick the IdToken claims from the request.
 
         :param session: Session information
         :return: The IdToken claims
@@ -1727,6 +1710,7 @@ class Server(oauth2.Server):
                       alg="RS256", code=None, access_token=None,
                       user_info=None, auth_time=0, exp=None, extra_claims=None):
         """
+        Create ID Token.
 
         :param session: Session information
         :param loa: Level of Assurance/Authentication context

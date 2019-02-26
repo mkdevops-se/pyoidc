@@ -30,6 +30,7 @@ from oic.oauth2.message import Message
 from oic.oauth2.message import MissingRequiredAttribute
 from oic.oauth2.message import MissingRequiredValue
 from oic.oauth2.message import NotAllowedValue
+from oic.oauth2.message import ParamDefinition
 from oic.oauth2.message import SchemeError
 from oic.utils import time_util
 
@@ -91,10 +92,10 @@ def json_rest(val, sformat=None, lev=0):
 
 
 # value type, required, serializer, deserializer, null value allowed
-SINGLE_OPTIONAL_BOOLEAN = (bool, False, None, None, False)
-SINGLE_OPTIONAL_JSON_WN = (dict, False, json_ser, json_deser, True)
-SINGLE_OPTIONAL_JSON_CONV = (dict, False, json_conv, json_rest, True)
-SINGLE_REQUIRED_INT = (int, True, None, None, False)
+SINGLE_OPTIONAL_BOOLEAN = ParamDefinition(bool, False, None, None, False)
+SINGLE_OPTIONAL_JSON_WN = ParamDefinition(dict, False, json_ser, json_deser, True)
+SINGLE_OPTIONAL_JSON_CONV = ParamDefinition(dict, False, json_conv, json_rest, True)
+SINGLE_REQUIRED_INT = ParamDefinition(int, True, None, None, False)
 
 
 def idtoken_deser(val, sformat="urlencoded"):
@@ -224,19 +225,17 @@ def claims_request_deser(val, sformat="json"):
     return ClaimsRequest().deserialize(val, sformat)
 
 
-OPTIONAL_ADDRESS = (Message, False, msg_ser, address_deser, False)
-OPTIONAL_LOGICAL = (bool, False, None, None, False)
-OPTIONAL_MULTIPLE_Claims = (Message, False, claims_ser, claims_deser, False)
+OPTIONAL_ADDRESS = ParamDefinition(Message, False, msg_ser, address_deser, False)
+OPTIONAL_LOGICAL = ParamDefinition(bool, False, None, None, False)
+OPTIONAL_MULTIPLE_Claims = ParamDefinition(Message, False, claims_ser, claims_deser, False)
 
-SINGLE_OPTIONAL_IDTOKEN = (str, False, msg_ser, None, False)
+SINGLE_OPTIONAL_IDTOKEN = ParamDefinition(str, False, msg_ser, None, False)
 
-SINGLE_OPTIONAL_REGISTRATION_REQUEST = (Message, False, msg_ser,
-                                        registration_request_deser, False)
-SINGLE_OPTIONAL_CLAIMSREQ = (Message, False, msg_ser_json, claims_request_deser,
-                             False)
+SINGLE_OPTIONAL_REGISTRATION_REQUEST = ParamDefinition(Message, False, msg_ser, registration_request_deser, False)
+SINGLE_OPTIONAL_CLAIMSREQ = ParamDefinition(Message, False, msg_ser_json, claims_request_deser, False)
 
-OPTIONAL_MESSAGE = (Message, False, msg_ser, message_deser, False)
-REQUIRED_MESSAGE = (Message, True, msg_ser, message_deser, False)
+OPTIONAL_MESSAGE = ParamDefinition(Message, False, msg_ser, message_deser, False)
+REQUIRED_MESSAGE = ParamDefinition(Message, True, msg_ser, message_deser, False)
 
 # ----------------------------------------------------------------------------
 
@@ -417,14 +416,17 @@ class AuthorizationRequest(message.AuthorizationRequest):
     })
 
     def verify(self, **kwargs):
-        """Authorization Request parameters that are OPTIONAL in the OAuth 2.0
+        """
+        Check that the request is valid.
+
+        Authorization Request parameters that are OPTIONAL in the OAuth 2.0
         specification MAY be included in the OpenID Request Object without also
         passing them as OAuth 2.0 Authorization Request parameters, with one
         exception: The scope parameter MUST always be present in OAuth 2.0
         Authorization Request parameters.
         All parameter values that are present both in the OAuth 2.0
-        Authorization Request and in the OpenID Request Object MUST exactly
-        match."""
+        Authorization Request and in the OpenID Request Object MUST exactly match.
+        """
         super(AuthorizationRequest, self).verify(**kwargs)
 
         args = {}
@@ -608,9 +610,8 @@ class RegistrationRequest(Message):
 
 
 class RegistrationResponse(Message):
-    """
-    Response to client_register registration requests
-    """
+    """Response to client_register registration requests."""
+
     c_param = {
         "client_id": SINGLE_REQUIRED_STRING,
         "client_secret": SINGLE_OPTIONAL_STRING,
@@ -623,6 +624,8 @@ class RegistrationResponse(Message):
 
     def verify(self, **kwargs):
         """
+        Verify that the response is valid.
+
         Implementations MUST either return both a Client Configuration Endpoint
         and a Registration Access Token or neither of them.
         :param kwargs:
@@ -882,7 +885,7 @@ def jwt_deser(val, sformat="json"):
     return JasonWebToken().deserialize(val, sformat)
 
 
-SINGLE_OPTIONAL_JWT = (Message, False, msg_ser, jwt_deser, False)
+SINGLE_OPTIONAL_JWT = ParamDefinition(Message, False, msg_ser, jwt_deser, False)
 
 
 class UserInfoErrorResponse(message.ErrorResponse):
@@ -948,7 +951,7 @@ MSG = {
 
 
 def factory(msgtype):
-    for name, obj in inspect.getmembers(sys.modules[__name__]):
+    for _, obj in inspect.getmembers(sys.modules[__name__]):
         if inspect.isclass(obj) and issubclass(obj, Message):
             try:
                 if obj.__name__ == msgtype:

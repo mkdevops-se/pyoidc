@@ -18,7 +18,7 @@ class DistributedAggregatedUserInfo(UserInfo):
         self.oidcsrv = oidcsrv
         self.claims_clients = self.init_claims_clients(client_info)
 
-        for key, cc in self.claims_clients.items():
+        for _, cc in self.claims_clients.items():
             oidcsrv.keyjar.update(cc.keyjar)
 
     def dynamic_init_claims_client(self, issuer, req_args):
@@ -77,11 +77,12 @@ class DistributedAggregatedUserInfo(UserInfo):
 
     def __call__(self, userid, client_id, user_info_claims=None, **kwargs):
         """
+        Collect the claims.
+
         :param userid: The local user id
         :param user_info_claims: Possible userinfo claims (a dictionary)
         :return: A schema dependent userinfo instance
         """
-
         logger.info("User_info about '%s'" % userid)
         identity = copy.copy(self.db[userid])
 

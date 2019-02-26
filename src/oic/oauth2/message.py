@@ -2,6 +2,9 @@ import copy
 import json
 import logging
 from collections import MutableMapping
+from collections import namedtuple
+from typing import Any  # noqa - This is used for MyPy
+from typing import Mapping  # noqa - This is used for MyPy
 from urllib.parse import parse_qs
 from urllib.parse import urlencode
 
@@ -125,9 +128,9 @@ def jwt_header(txt):
 
 
 class Message(MutableMapping):
-    c_param = {}
-    c_default = {}
-    c_allowed_values = {}
+    c_param = {}  # type: Mapping[str, ParamDefinition]
+    c_default = {}  # type: Mapping[str, Any]
+    c_allowed_values = {}  # type: ignore
 
     def __init__(self, **kwargs):
         self._dict = self.c_default.copy()
@@ -151,35 +154,42 @@ class Message(MutableMapping):
         for key, val in self.c_default.items():
             self._dict[key] = val
 
+    @staticmethod
+    def _extract_cparam(key, _spec):
+        """
+        Extract ParamDefinition for a given key.
+
+        The key can be direct attribute or lang typed attribute.
+        If ParamDefinition is not found, tries to return "*" attribute, if it exists, otherwise returns None.
+        """
+        for _key in (key, key.split('#')[0], '*'):
+            if _key in _spec:
+                return _spec[_key]
+        return None
+
     def to_urlencoded(self, lev=0):
         """
-        Creates a string using the application/x-www-form-urlencoded format
+        Create a string using the application/x-www-form-urlencoded format.
 
         :return: A string of the application/x-www-form-urlencoded format
         """
-
         _spec = self.c_param
         if not self.lax:
-            for attribute, (_, req, _ser, _, na) in _spec.items():
-                if req and attribute not in self._dict:
+            for attribute, cparam in _spec.items():
+                if cparam.required and attribute not in self._dict:
                     raise MissingRequiredAttribute("%s" % attribute,
                                                    "%s" % self)
 
         params = []
 
         for key, val in self._dict.items():
-            try:
-                (_, req, _ser, _, null_allowed) = _spec[key]
-            except KeyError:  # extra attribute
-                try:
-                    _key, lang = key.split("#")
-                    (_, req, _ser, _deser, null_allowed) = _spec[_key]
-                except (ValueError, KeyError):
-                    try:
-                        (_, req, _ser, _, null_allowed) = _spec['*']
-                    except KeyError:
-                        _ser = None
-                        null_allowed = False
+            cparam = self._extract_cparam(key, _spec)
+            if cparam is not None:
+                _ser = cparam.serializer
+                null_allowed = cparam.null_allowed
+            else:
+                _ser = None
+                null_allowed = False
 
             if val is None and null_allowed is False:
                 continue
@@ -231,13 +241,11 @@ class Message(MutableMapping):
 
     def from_urlencoded(self, urlencoded, **kwargs):
         """
-        from a string of the application/x-www-form-urlencoded format creates
-        a class instance
+        Create a class instance from a string of the application/x-www-form-urlencoded format.
 
         :param urlencoded: The string
         :return: An instance of the cls class
         """
-
         # parse_qs returns a dictionary with keys and values. The values are
         # always lists even if there is only one value in the list.
         # keys only appears once.
@@ -250,36 +258,28 @@ class Message(MutableMapping):
         _spec = self.c_param
 
         for key, val in parse_qs(urlencoded).items():
-            try:
-                (typ, _, _, _deser, null_allowed) = _spec[key]
-            except KeyError:
-                try:
-                    _key, lang = key.split("#")
-                    (typ, _, _, _deser, null_allowed) = _spec[_key]
-                except (ValueError, KeyError):
-                    try:
-                        (typ, _, _, _deser, null_allowed) = _spec['*']
-                    except KeyError:
-                        if len(val) == 1:
-                            val = val[0]
+            cparam = self._extract_cparam(key, _spec)
+            if cparam is None:
+                if len(val) == 1:
+                    val = val[0]
 
-                        self._dict[key] = val
-                        continue
+                self._dict[key] = val
+                continue
 
-            if isinstance(typ, list):
-                if _deser:
-                    self._dict[key] = _deser(val[0], "urlencoded")
+            if isinstance(cparam.type, list):
+                if cparam.deserializer is not None:
+                    self._dict[key] = cparam.deserializer(val[0], "urlencoded")
                 else:
                     self._dict[key] = val
             else:  # must be single value
                 if len(val) == 1:
-                    if _deser:
-                        self._dict[key] = _deser(val[0], "urlencoded")
-                    elif isinstance(val[0], typ):
+                    if cparam.deserializer is not None:
+                        self._dict[key] = cparam.deserializer(val[0], "urlencoded")
+                    elif isinstance(val[0], cparam.type):
                         self._dict[key] = val[0]
                     else:
                         try:
-                            self._dict[key] = typ(val[0])
+                            self._dict[key] = cparam.type(val[0])
                         except KeyError:
                             raise ParameterError(key)
                 else:
@@ -289,28 +289,20 @@ class Message(MutableMapping):
 
     def to_dict(self, lev=0):
         """
-        Return a dictionary representation of the class
+        Return a dictionary representation of the class.
 
         :return: A dict
         """
-
         _spec = self.c_param
 
         _res = {}
         lev += 1
         for key, val in self._dict.items():
-            try:
-                (_, req, _ser, _, null_allowed) = _spec[str(key)]
-            except KeyError:
-                try:
-                    _key, lang = key.split("#")
-                    (_, req, _ser, _, null_allowed) = _spec[_key]
-                except (ValueError, KeyError):
-                    try:
-                        (_, req, _ser, _, null_allowed) = _spec['*']
-                    except KeyError:
-                        _ser = None
-
+            cparam = self._extract_cparam(key, _spec)
+            if cparam is not None:
+                _ser = cparam.serializer
+            else:
+                _ser = None
             if _ser:
                 val = _ser(val, "dict", lev)
 
@@ -325,35 +317,19 @@ class Message(MutableMapping):
 
     def from_dict(self, dictionary, **kwargs):
         """
-        Direct translation so the value for one key might be a list or a
-        single value.
+        Direct translation so the value for one key might be a list or a single value.
 
         :param dictionary: The info
         :return: A class instance or raise an exception on error
         """
-
         _spec = self.c_param
 
         for key, val in dictionary.items():
-            # Earlier versions of python don't like unicode strings as
-            # variable names
-            if val == "" or val == [""]:
+            if val in ('', ['']):
                 continue
-
-            skey = str(key)
-            if key in _spec:
-                lookup_key = key
-            else:
-                # might be a parameter with a lang tag
-                try:
-                    _key, lang = skey.split("#")
-                except ValueError:
-                    lookup_key = '*'
-                else:
-                    lookup_key = _key
-            if lookup_key in _spec:
-                (vtyp, _, _, _deser, null_allowed) = _spec[lookup_key]
-                self._add_value(skey, vtyp, key, val, _deser, null_allowed)
+            cparam = self._extract_cparam(key, _spec)
+            if cparam is not None:
+                self._add_value(key, cparam.type, key, val, cparam.deserializer, cparam.null_allowed)
             else:
                 self._dict[key] = val
         return self
@@ -404,7 +380,8 @@ class Message(MutableMapping):
                     self._dict[skey] = val
 
     def _add_value_list(self, skey, vtype, key, val, _deser, null_allowed):
-        """Add value with internal type (``vtype``) of ``list`` to the message object.
+        """
+        Add value with internal type (``vtype``) of ``list`` to the message object.
 
         :param skey: String representation of key
         :param vtype: Type of object in list
@@ -467,13 +444,12 @@ class Message(MutableMapping):
 
     def to_jwt(self, key=None, algorithm="", lev=0):
         """
-        Create a signed JWT representation of the class instance
+        Create a signed JWT representation of the class instance.
 
         :param key: The signing key
         :param algorithm: The signature algorithm to use
         :return: A signed JWT
         """
-
         _jws = JWS(self.to_json(lev), alg=algorithm)
         return _jws.sign_compact(key)
 
@@ -514,7 +490,7 @@ class Message(MutableMapping):
 
     def get_verify_keys(self, keyjar, key, jso, header, jwt, **kwargs):
         """
-        Get keys from a keyjar that can be used to verify a signed JWT
+        Get keys from a keyjar that can be used to verify a signed JWT.
 
         :param keyjar: A KeyJar instance
         :param key: List of keys to start with
@@ -590,8 +566,7 @@ class Message(MutableMapping):
 
     def from_jwt(self, txt, key=None, verify=True, keyjar=None, **kwargs):
         """
-        Given a signed and/or encrypted JWT, verify its correctness and then
-        create a class instance from the content.
+        Given a signed and/or encrypted JWT, verify its correctness and then create a class instance from the content.
 
         :param txt: The JWT
         :param key: keys that might be used to decrypt and/or verify the
@@ -701,57 +676,47 @@ class Message(MutableMapping):
             raise NotAllowedValue(val)
 
     def verify(self, **kwargs):
-        """
-        Make sure all the required values are there and that the values are
-        of the correct type
-        """
+        """Make sure all the required values are there and that the values are of the correct type."""
         _spec = self.c_param
         try:
             _allowed = self.c_allowed_values
         except KeyError:
             _allowed = {}
 
-        for (attribute, (typ, required, _, _, na)) in _spec.items():
+        for attribute, cparam in _spec.items():
             if attribute == "*":
                 continue
 
-            try:
-                val = self._dict[attribute]
-            except KeyError:
-                if required:
+            val = self._dict.get(attribute)
+            if val is None:
+                if cparam.required:
                     raise MissingRequiredAttribute("%s" % attribute)
                 continue
-            else:
-                if typ == bool:
-                    pass
-                elif not val:
-                    if required:
-                        raise MissingRequiredAttribute("%s" % attribute)
-                    continue
+            if cparam.type != bool and not val:
+                if cparam.required:
+                    raise MissingRequiredAttribute("%s" % attribute)
+                continue
 
             if attribute not in _allowed:
                 continue
 
-            if isinstance(typ, tuple):
-                _ityp = None
-                for _typ in typ:
+            if isinstance(cparam.type, tuple):
+                for _typ in cparam.type:
                     try:
                         self._type_check(_typ, _allowed[attribute], val)
-                        _ityp = _typ
                         break
                     except ValueError:
                         pass
-                if _ityp is None:
-                    raise NotAllowedValue(val)
+                    else:
+                        raise NotAllowedValue(val)
             else:
-                self._type_check(typ, _allowed[attribute], val, na)
+                self._type_check(cparam.type, _allowed[attribute], val, cparam.null_allowed)
 
         return True
 
     def keys(self):
         """
-        Return a list of attribute/keys/parameters of this class that has
-        values.
+        Return a list of attribute/keys/parameters of this class that has values.
 
         :return: A list of attribute names
         """
@@ -788,8 +753,8 @@ class Message(MutableMapping):
 
     def __setitem__(self, key, value):
         try:
-            (vtyp, req, _, _deser, na) = self.c_param[key]
-            self._add_value(str(key), vtyp, key, value, _deser, na)
+            cparam = self.c_param[key]
+            self._add_value(str(key), cparam.type, key, value, cparam.deserializer, cparam.null_allowed)
         except KeyError:
             self._dict[key] = value
 
@@ -832,17 +797,17 @@ class Message(MutableMapping):
 
     def to_jwe(self, keys, enc, alg, lev=0):
         """
-        Place the information in this instance in a JSON object. Make that
-        JSON object the body of a JWT. Then encrypt that JWT using the
-        specified algorithms and the given keys. Return the encrypted JWT.
+        Place the information in this instance in a JSON object.
+
+        Make that JSON object the body of a JWT. Then encrypt that JWT using the specified algorithms
+        and the given keys. Return the encrypted JWT.
 
         :param keys: Dictionary, keys are key type and key is the value or
         simple list.
         :param enc: Content Encryption Algorithm
         :param alg: Key Management Algorithm
         :param lev: Used for JSON construction
-        :return: An encrypted JWT. If encryption failed an exception will be
-        raised.
+        :return: An encrypted JWT. If encryption failed an exception will be raised.
         """
         if isinstance(keys, dict):
             keys = keyitems2keyreps(keys)
@@ -852,14 +817,11 @@ class Message(MutableMapping):
 
     def from_jwe(self, msg, keys):
         """
-        Decrypt an encrypted JWT and load the JSON object that was the body
-        of the JWT into this object.
+        Decrypt an encrypted JWT and load the JSON object that was the body of the JWT into this object.
 
         :param msg: An encrypted JWT
-        :param keys: Dictionary, keys are key type and key is the value or
-        simple list.
-        :return: The decrypted message. If decryption failed an exception
-        will be raised.
+        :param keys: Dictionary, keys are key type and key is the value or simple list.
+        :return: The decrypted message. If decryption failed an exception will be raised.
         """
         if isinstance(keys, dict):
             keys = keyitems2keyreps(keys)
@@ -872,17 +834,13 @@ class Message(MutableMapping):
         return copy.deepcopy(self)
 
     def weed(self):
-        """
-        Get rid of key value pairs that are not standard
-        """
+        """Get rid of key value pairs that are not standard."""
         _ext = [k for k in self._dict.keys() if k not in self.c_param]
         for k in _ext:
             del self._dict[k]
 
     def rm_blanks(self):
-        """
-        Get rid of parameters that has no value.
-        """
+        """Get rid of parameters that has no value."""
         _blanks = [k for k in self._dict.keys() if not self._dict[k]]
         for key in _blanks:
             del self._dict[key]
@@ -952,19 +910,15 @@ VSER = 2
 VDESER = 3
 VNULLALLOWED = 4
 
-SINGLE_REQUIRED_STRING = (str, True, None, None, False)
-SINGLE_OPTIONAL_STRING = (str, False, None, None, False)
-SINGLE_OPTIONAL_INT = (int, False, None, None, False)
-OPTIONAL_LIST_OF_STRINGS = ([str], False, list_serializer,
-                            list_deserializer, False)
-REQUIRED_LIST_OF_STRINGS = ([str], True, list_serializer,
-                            list_deserializer, False)
-OPTIONAL_LIST_OF_SP_SEP_STRINGS = ([str], False, sp_sep_list_serializer,
-                                   sp_sep_list_deserializer, False)
-REQUIRED_LIST_OF_SP_SEP_STRINGS = ([str], True, sp_sep_list_serializer,
-                                   sp_sep_list_deserializer, False)
-SINGLE_OPTIONAL_JSON = (str, False, json_serializer, json_deserializer,
-                        False)
+ParamDefinition = namedtuple('ParamDefinition', ['type', 'required', 'serializer', 'deserializer', 'null_allowed'])
+SINGLE_REQUIRED_STRING = ParamDefinition(str, True, None, None, False)
+SINGLE_OPTIONAL_STRING = ParamDefinition(str, False, None, None, False)
+SINGLE_OPTIONAL_INT = ParamDefinition(int, False, None, None, False)
+OPTIONAL_LIST_OF_STRINGS = ParamDefinition([str], False, list_serializer, list_deserializer, False)
+REQUIRED_LIST_OF_STRINGS = ParamDefinition([str], True, list_serializer, list_deserializer, False)
+OPTIONAL_LIST_OF_SP_SEP_STRINGS = ParamDefinition([str], False, sp_sep_list_serializer, sp_sep_list_deserializer, False)
+REQUIRED_LIST_OF_SP_SEP_STRINGS = ParamDefinition([str], True, sp_sep_list_serializer, sp_sep_list_deserializer, False)
+SINGLE_OPTIONAL_JSON = ParamDefinition(str, False, json_serializer, json_deserializer, False)
 
 REQUIRED = [SINGLE_REQUIRED_STRING, REQUIRED_LIST_OF_STRINGS,
             REQUIRED_LIST_OF_SP_SEP_STRINGS]

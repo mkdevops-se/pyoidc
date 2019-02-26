@@ -43,12 +43,11 @@ BASECH = string.ascii_letters + string.digits + '-._~'
 
 def unreserved(size=64):
     """
-    Returns a string of random ascii characters, digits and unreserve characters
+    Return a string of random ascii characters, digits and unreserve characters.
 
     :param size: The length of the string
     :return: string
     """
-
     return "".join([random.choice(BASECH) for _ in range(size)])
 
 
@@ -131,9 +130,9 @@ class Client(oauth2.Client):
     def do_op(self, request, body_type='', method='GET', request_args=None,
               extra_args=None, http_args=None, response_cls=None, **kwargs):
 
-        url, body, ht_args, csi = self.request_info(request, method,
-                                                    request_args, extra_args,
-                                                    **kwargs)
+        url, body, ht_args, _ = self.request_info(request, method,
+                                                  request_args, extra_args,
+                                                  **kwargs)
 
         if http_args is None:
             http_args = ht_args
@@ -260,14 +259,13 @@ class Client(oauth2.Client):
 
     def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
         """
-        Deal with Provider Config Response
+        Deal with Provider Config Response.
+
         :param pcr: The ProviderConfigResponse instance
         :param issuer: The one I thought should be the issuer of the config
         :param keys: Should I deal with keys
-        :param endpoints: Should I deal with endpoints, that is store them
-        as attributes in self.
+        :param endpoints: Should I deal with endpoints, that is store them as attributes in self.
         """
-
         if "issuer" in pcr:
             _pcr_issuer = pcr["issuer"]
             if pcr["issuer"].endswith("/"):
@@ -355,7 +353,7 @@ class Client(oauth2.Client):
 
     def register(self, url, **kwargs):
         """
-        Register the client at an OP
+        Register the client at an OP.
 
         :param url: The OPs registration endpoint
         :param kwargs: parameters to the registration request

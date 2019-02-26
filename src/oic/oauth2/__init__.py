@@ -148,6 +148,7 @@ class Client(PBase):
                  keyjar=None, verify_ssl=True, config=None, client_cert=None,
                  timeout=5):
         """
+        Initialize the instance.
 
         :param client_id: The client identifier
         :param client_authn_method: Methods that this client can use to
@@ -161,7 +162,6 @@ class Client(PBase):
             ``requests`` documentation.
         :return: Client instance
         """
-
         PBase.__init__(self, verify_ssl=verify_ssl, keyjar=keyjar,
                        client_cert=client_cert, timeout=timeout)
 
@@ -485,7 +485,7 @@ class Client(PBase):
     def parse_response(self, response, info="", sformat="json", state="",
                        **kwargs):
         """
-        Parse a response
+        Parse a response.
 
         :param response: Response type
         :param info: The response, can be either in a JSON or an urlencoded
@@ -495,7 +495,6 @@ class Client(PBase):
         :param kwargs: Extra key word arguments
         :return: The parsed and to some extend verified response
         """
-
         _r2e = self.response2error
 
         if sformat == "urlencoded":
@@ -555,7 +554,7 @@ class Client(PBase):
 
         self.store_response(resp, info)
 
-        if resp.type() in ["AuthorizationResponse", "AccessTokenResponse"]:
+        if isinstance(resp, (AuthorizationResponse, AccessTokenResponse)):
             try:
                 _state = resp["state"]
             except (AttributeError, KeyError):
@@ -635,16 +634,16 @@ class Client(PBase):
                            body_type="json", state="", http_args=None,
                            **kwargs):
         """
+        Perform a request and return the response.
+
         :param url: The URL to which the request should be sent
         :param response: Response type
         :param method: Which HTTP method to use
         :param body: A message body if any
         :param body_type: The format of the body of the return message
         :param http_args: Arguments for the HTTP client
-        :return: A cls or ErrorResponse instance or the HTTP response
-            instance if no response body was expected.
+        :return: A cls or ErrorResponse instance or the HTTP response instance if no response body was expected.
         """
-
         if http_args is None:
             http_args = {}
 
@@ -768,12 +767,12 @@ class Client(PBase):
                method="POST", request_args=None, extra_args=None,
                http_args=None, response=None, authn_method=""):
 
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    scope=scope, state=state,
-                                                    authn_method=authn_method,
-                                                    endpoint=endpoint)
+        url, body, ht_args, _ = self.request_info(request, method=method,
+                                                  request_args=request_args,
+                                                  extra_args=extra_args,
+                                                  scope=scope, state=state,
+                                                  authn_method=authn_method,
+                                                  endpoint=endpoint)
 
         if http_args is None:
             http_args = ht_args
@@ -816,7 +815,7 @@ class Client(PBase):
 
     def add_code_challenge(self):
         """
-        PKCE RFC 7636 support
+        PKCE RFC 7636 support.
 
         :return:
         """
@@ -847,14 +846,13 @@ class Client(PBase):
 
     def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
         """
-        Deal with Provider Config Response
+        Deal with Provider Config Response.
+
         :param pcr: The ProviderConfigResponse instance
         :param issuer: The one I thought should be the issuer of the config
         :param keys: Should I deal with keys
-        :param endpoints: Should I deal with endpoints, that is store them
-        as attributes in self.
+        :param endpoints: Should I deal with endpoints, that is store them as attributes in self.
         """
-
         if "issuer" in pcr:
             _pcr_issuer = pcr["issuer"]
             if pcr["issuer"].endswith("/"):
@@ -926,7 +924,7 @@ class Server(PBase):
     def parse_url_request(request, url=None, query=None):
         if url:
             parts = urlparse(url)
-            scheme, netloc, path, params, query, fragment = parts[:6]
+            query = parts.query
 
         if isinstance(query, dict):
             req = request(**query)
