@@ -1,6 +1,6 @@
-#OP2 Example
-###Setup
-####Client Management
+# OP2 Example
+### Setup
+#### Client Management
 
 To be able to start up the project you have to create a new client to the client_db.
 This is done by the CLI applilcation client_manageent.py
@@ -8,14 +8,14 @@ The allowed redirect_uris must be given and the client_id, and client_secret are
 
 See some samples below. 
 
-#####Add new client 
+##### Add new client 
 Start client_management with -c and answer the upcoming questions. 
 ../../src/oic/utils/client_management.py -c client_db
 
-#####List clients
+##### List clients
 ../../src/oic/utils/client_management.py -l  client_db
 
-#####Show values for a specific client
+##### Show values for a specific client
 ../../src/oic/utils/client_management.py -s  -i <client id>  client_db
  
 {
@@ -25,10 +25,10 @@ Start client_management with -c and answer the upcoming questions.
 'client_id': '9D8nyeoaIfE8'
 }
 
-#####Show all command line options
+##### Show all command line options
 ../../src/oic/utils/client_management.py -h  client_db
 
 
-###Good to know
+### Good to know
 If the max_age is not set in the authorization request the max_age will be 0 and the authorization cookie will never expire. 
 
