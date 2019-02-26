@@ -1,1 +1,6 @@
-client_db
+client_db*
+config.py
+sp_cert/*
+!sp_cert/localhost.crt
+!sp_cert/localhost.key
+static/jwks.json
