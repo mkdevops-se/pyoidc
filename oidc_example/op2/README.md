@@ -1,5 +1,5 @@
-# OP2 Example
-### Setup
+#OP2 Example
+###Setup
 ####Client Management
 
 To be able to start up the project you have to create a new client to the client_db.
@@ -29,6 +29,6 @@ Start client_management with -c and answer the upcoming questions.
 ../../src/oic/utils/client_management.py -h  client_db
 
 
-##Good to know
+###Good to know
 If the max_age is not set in the authorization request the max_age will be 0 and the authorization cookie will never expire. 
 
