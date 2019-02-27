@@ -1,4 +1,15 @@
-# OP2 Example
+OP2 Example
+===========
+
+Getting Started
+---------------
+
+    git clone https://github.com/OpenIDC/pyoidc.git && cd pyoidc/oidc_example/op2/  
+    python3 -m venv venv && . venv/bin/activate  
+    pip install -r requirements.txt       
+    ./start.sh 
+
+
 ### Setup
 #### Client Management
 
@@ -31,4 +42,3 @@ Start client_management with -c and answer the upcoming questions.
 
 ### Good to know
 If the max_age is not set in the authorization request the max_age will be 0 and the authorization cookie will never expire. 
-
